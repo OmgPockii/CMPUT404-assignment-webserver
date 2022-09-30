@@ -32,8 +32,63 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        fileName = self.parseData(self.data)
 
+        # Handling
+        if type(fileName) == str:
+            try:
+                file = open("www" + fileName[:-1], "r")
+                print(file)
+
+                contentType = ""
+
+                if file.endswith(".html/"):
+                    contentType = "text/html"
+                    return contentType
+                elif file.endswith(".css/"):
+                    contentType = "text/css"
+                    return contentType
+                else:
+                    print("Not applicable content type!")
+                    print(contentType)
+                
+                self.request.sendall(bytearray("HTTP/1.1 200 OK\r\n", "utf-8"))
+                self.request.sendall(bytearray("Content Type: " + contentType + "\r\n\n", "utf-8"))
+                self.request.sendall(bytearray(file.read(), "utf-8"))
+                file.close()
+            except: # Error handling (404)
+                self.request.sendall(bytearray("HTTP/1.1 404 Not Found\r\n", "utf-8"))
+
+    
+    def parseData(self, data):
+        # This function processes and parses the GET request
+        data = data.decode()
+
+        # Handing for reponses that default to invalid/incorrect
+        if data == "":
+            return None
+        if not data.startswith("GET"): # We should only handle GET methods
+            return self.request.sendall(bytearray("HTTP/1.1 405 Method Not Allowed\r\n", "utf-8"))
+
+        
+        # Decompose to the "Request-URI" we need
+        message = data.rsplit(" ")
+        fileName = message[1]
+        fileName = fileName + "/"
+        print(fileName)
+
+        # Assembling/processessing file name
+        if fileName[-1] != "/": # Check for 301 
+            return self.request.sendall(bytearray("HTTP/1.1 301 Moved Permanently\r\nLocation: http://127.0.0.1:8000" + fileName + "/\r\n\n", "utf-8"))
+        if fileName == "/" or (not fileName.endswith("css/") and not fileName.endswith("html/")): 
+            return(fileName + "index.html/")
+        elif fileName.endswith("css/") and fileName != "/base.css/":
+            return(fileName.replace("index.html/", ""))
+        else:
+            print("xd")
+            return fileName
+
+    
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
 
